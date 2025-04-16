@@ -131,6 +131,37 @@ def listSplit(s:list, sep):
     segments.append(z)
     return segments
 
+def extractTests(condition:str, task:Dict):
+    """
+    Each task comes with test cases, which may be grouped into test suites.
+    If so, the suites are separeted by a '===' token. In the current format,
+    there will be at most three suites.
+    This function will extract the test suites available in a task. 
+    """
+    # if the test-cases are marked with a split token, this indicates that
+    # they consists of two groups: base-group and validation-group.
+    # We separate them:
+    splitToken = '==='
+    test_cases0 = eval(task[f"{condition}_condition_tests"])
+    test_suites = listSplit(test_cases0,splitToken)
+    suite_Base0 = test_suites[0]
+    suite_Base1 = []
+    suite_Validation = []
+    if len(test_suites) == 2:
+       suite_Validation = test_suites[1]
+    elif len(test_suites) > 2: 
+        suite_Base1 = test_suites[1]
+        for suite in test_suites[2:] : suite_Validation.extend(suite)
+    else:
+        # should not happen... but if this does happen,
+        # then we simply have no validation suite
+        suite_Validation = []
+    return {
+        "suite_Base0" : suite_Base0,
+        "suite_Base1" : suite_Base1,
+        "suite_Validation" : suite_Validation
+    }
+
 def evaluate_task_result(task: Dict, condition: str):
     """
     Given a single task T, described as a dictionary. This dictionary
@@ -181,21 +212,10 @@ def evaluate_task_result(task: Dict, condition: str):
     # if the test-cases are marked with a split token, this indicates that
     # they consists of two groups: base-group and validation-group.
     # We separate them:
-    splitToken = '==='
-    test_cases0 = eval(task[f"{condition}_condition_tests"])
-    test_suites = listSplit(test_cases0,splitToken)
-    suite_Base0 = test_suites[0]
-    suite_Base1 = []
-    suite_Validation = []
-    if len(test_suites) == 2:
-       suite_Validation = test_suites[1]
-    elif len(test_suites) > 2: 
-        suite_Base1 = test_suites[1]
-        for suite in test_suites[2:] : suite_Validation.extend(suite)
-    else:
-        # should not happen... but if this does happen,
-        # then we simply have no validation suite
-        suite_Validation = []
+    testSuites = extractTests(condition,task)
+    suite_Base0 = testSuites["suite_Base0"]
+    suite_Base1 = testSuites["suite_Base1"]
+    suite_Validation = testSuites["suite_Validation"]
 
     # executing the test-cases on the solution-function, also not expecting these
     # to fail:

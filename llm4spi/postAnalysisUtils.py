@@ -1,7 +1,8 @@
 import json
-from data import read_problems
+from data import read_problems, write_json
 import os.path
-
+from basicEvaluate import extractTests
+from typing import Dict
 
 
 def exportOutLLMProposals(datasetFile:str, outputjson:str, dirToPutGeneratedPy:str):
@@ -55,6 +56,82 @@ def exportOutLLMProposals(datasetFile:str, outputjson:str, dirToPutGeneratedPy:s
             if "post_condition_solution" in T:
                 completions = R["post_condition_completions"]
                 writeProposals(Tid,"post",completions)
+
+def exportLLMPTestResults(datasetFile:str, outputjson:str, dirToPutOutputFile:str):
+    """
+    This takes the evaluation output file from xxx4spi script (e.g. openai4spi),
+    and collects and reorganizes the results of running the tests-cases, 
+    and puts them in an output file.
+
+    The input json-data is a list, where each element represent a task/problem T.
+    It contains, among others, LLM's candidates for pre/post-conditions in the
+    problem T. It also contains the results on running the test-cases in T on 
+    each of these candidates. This function will extract these test-results 
+    and re-arrange them so that for e.g. T's post-cond, we construct a list
+    of results. Each item nr-k in this list is essentially a tuple (actually, a 
+    dictionary) (tag,tc,r,e) were tc is the test-case (values), r is the result
+    (true/false/None) of running this tc on post-cond-candidate k, e is the 
+    expected result (true/false) of running tc on the solution-post-cond.
+   
+    The tag is a name of the test-suite to which tc belongs to.
+
+    The resulting lists of results are written to a new json file.
+    """
+    problems = read_problems(datasetFile)
+
+    outputBaseName = os.path.basename(outputjson)
+    outputBaseName = os.path.splitext(outputBaseName)[0]
+    with open(outputjson, "r") as fp:
+        baseEvaluationResults = json.load(fp)
+
+    def putTogetherTestResults(suiteName,tests,results,expectedResults):
+        return [ { "suite" : suiteName,
+                   "test" : f"{tc}",
+                   "result" : r,
+                   "expected" : expected } 
+                   for (tc,r,expected) in zip(tests,results,expectedResults) ]
+
+    # for collecting the test-results of a sigle task/problem:    
+    def getTestResultsOfSolution(cond:str, task:Dict):
+        tId = task["task_id"]
+        tests = extractTests(cond,problems[tId])
+        expectedResults = task[f"{cond}_condition_reference_TestResults"]
+        expectedResults_base0 = expectedResults["base0"]
+        expectedResults_base1 = expectedResults["base1"]
+        expectedResults_validationSuite = expectedResults["validationSuite"]
+        numberOfCandidates = len(task["{post}_condition_completions"])
+        all_results = []
+        for k in range(0, numberOfCandidates) :
+            results = task[f"{cond}_condition_candidates_TestResults"][k]
+            if results["def-loaded"] == "success" :
+                results_base0 = results["base0"]
+                results_base1 = results["base1"]
+                results_validationSuite = results["validationSuite"]
+            else:
+                results_base0 = [None] * len(expectedResults_base0)
+                results_base1 = [None] * len(expectedResults_base1)
+                results_validationSuite = [None] * len(expectedResults_validationSuite)
+
+            z0 = putTogetherTestResults("human-positive",tests["suite_Base0"],results_base0,expectedResults_base0)
+            z1 = putTogetherTestResults("human-negative",tests["suite_Base1"],results_base1,expectedResults_base1)
+            z2 = putTogetherTestResults("human-validation",tests["suite_Validation"],results_validationSuite,expectedResults_validationSuite)
+            all_results.append(z0 + z1 + z2)
+            
+        return all_results
+
+    # collect the test-results for all tasks, put them in this list:
+    allall_results = [ {
+          "task_id" : T["task_id"],
+          "pre_condition" : None if T["pre_condition_prompt"] == None else getTestResultsOfSolution("pre",T),
+          "post_condition" : None if T["post_condition_prompt"] == None else getTestResultsOfSolution("post",T)
+        }
+        for T in baseEvaluationResults ]
+
+    # now we dump the results/list to a json-file:
+    testResultsFile = "testResults_" + outputBaseName + ".json"
+    testResultsFile = os.path.join(dirToPutOutputFile, testResultsFile)
+    write_json(testResultsFile, allall_results)
+
 
 
 def executeLLMProposal(datasetFile:str, outputjson:str, Tid:str, condTy:str, proposalIndex:int, tc:list):
