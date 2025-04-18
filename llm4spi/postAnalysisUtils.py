@@ -80,7 +80,7 @@ def exportLLMPTestResults(datasetFile:str, outputjsonFile:str, dirToPutOutputFil
     """
     problems = read_problems(datasetFile)
 
-    outputBaseName = os.path.basename(outputjson)
+    outputBaseName = os.path.basename(outputjsonFile)
     outputBaseName = os.path.splitext(outputBaseName)[0]
     with open(outputjsonFile, "r") as fp:
         baseEvaluationResults = json.load(fp)
@@ -300,7 +300,7 @@ def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
     
     #print (f"{topLevelSummries(results_postconds)}")
     
-    return (topLevelSummries(results_preconds), topLevelSummries(results_postconds))
+    return (outputfileBaseName, topLevelSummries(results_preconds), topLevelSummries(results_postconds))
 
        
 
