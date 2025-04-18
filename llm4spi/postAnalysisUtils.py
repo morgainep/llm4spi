@@ -135,10 +135,27 @@ def exportLLMPTestResults(datasetFile:str, outputjsonFile:str, dirToPutOutputFil
 
 
 def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str, 
-                                       condition:str, 
+                                       condition:str, # pre or post
                                        suiteName:str, 
                                        suiteSelectionFunction):
 
+    """
+    Given a json-file containing tests-results as produce by the function exportLLMPTestResults(),
+    this will calculate the verdict per-candidate (e.g. whether the candidate is accepted or rejected),
+    judged by a selected test-suite. The test-suite is a subset of all the test-cases that are available
+    per task/problem, as listed in the input test-results-json file. Which test-cases are included
+    is decided by the given suiteSelectionFunction.
+
+    So, per task/problem T, a test-suite S is selected (with the aforementioned selectionFunction),
+    then we decide for each candidate for T we use S to decide a verdict: whether the candidate is 
+    accepted or rejected. We also calculate for each T statistics like acceptance rate.
+
+    The for thw whole set of tasks, we also produce statistics like average acceptance rate.
+
+    The method returns a tuple (S,TS,V) where S contains some summary statistics for the whole
+    set of tasks, TS is a set of per-task-statistics, and V is the whole set of the raw verdicts
+    per candidate.
+    """
     with open(testResultsJsonFile, "r") as ftrs:
         allTestResults = json.load(ftrs)
 
@@ -223,7 +240,16 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
     )
 
 def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
+    """
+    Given a json-file containing tests-results as produce by the function exportLLMPTestResults(),
+    this will calculate verdicts per candidate and produce per-task statistics and
+    statistics for whole set of tasks.
 
+    Various analysis results are saved to files. Additionally, top-level statistics are 
+    returned.
+    """
+
+    # we choose several test suites here:
     fsuite_HP   = lambda S : [ t for t in S if t["suite"] == "human-positive"]
     fsuite_HN   = lambda S : [ t for t in S if t["suite"] == "human-negative"]
     fsuite_HPN  = lambda S : fsuite_HP(S) + fsuite_HN(S)
@@ -271,15 +297,12 @@ def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
     write_json(file, perTaskSummaries(results_postconds))
     file = os.path.join(dirToPutOutputFiles, "postCondAnalysisRawVerdicts_" + outputfileBaseName + ".json")
     write_json(file, rawVerdicts(results_postconds))
-
+    
     #print (f"{topLevelSummries(results_postconds)}")
     
-    
+    return (topLevelSummries(results_preconds), topLevelSummries(results_postconds))
 
-    
-        
-
-        
+       
 
 
 def executeLLMProposal(datasetFile:str, outputjsonFile:str, Tid:str, condTy:str, proposalIndex:int, tc:list):
