@@ -303,7 +303,35 @@ def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
     return (outputfileBaseName, topLevelSummries(results_preconds), topLevelSummries(results_postconds))
 
        
+def executeSolutionPrePostCond(datasetFile:str, Tid:str, condTy:str, tc:list):
+    """
+    Give a testcase to be run by the solution pre/post-condition of a given problem 
+    (specified by the problem-id Tid). 
+    """
+    dataset = read_problems(datasetFile)
+    r = executeSolutionPrePostCondWorker(dataset,Tid,condTy,tc)
+    return r
 
+def executeSolutionPrePostCondWorker(dataset:Dict, Tid:str, condTy:str, tc:list):
+    """
+    The worker-function of executeSolutionPrePostCond. You can pass the json to this worker-function,
+    so if you call it multiple times you don't have to keep reading the json from its file.
+    """
+    T = dataset[Tid]
+    fx = f"{condTy}_condition_solution"
+    if not (fx in T) or T[fx] == None or T[fx] == "" : return None
+    funcDef = T[fx]
+    funcName = f"check_{condTy}_solution_{Tid}"  
+    try :
+        exec(funcDef,globals())
+    except:
+        print(f">>> Fail to load the definition of the solution of {condTy}-cond of {Tid}")
+        return None
+    # both work:
+    #eval(f"{funcName}(*{tc})")
+    r = eval(f"{funcName}(*tc)")
+    return r
+    
 
 def executeLLMProposal(datasetFile:str, outputjsonFile:str, Tid:str, condTy:str, proposalIndex:int, tc:list):
     """
@@ -322,8 +350,18 @@ def executeLLMProposal(datasetFile:str, outputjsonFile:str, Tid:str, condTy:str,
     The tc is a list of values. If the proposal is a post-condition, the first element of tc should
     represent the return value of the program that is being specified by the post-cond.
     """
-    problems = read_problems(datasetFile)
-    T = problems[Tid]
+    dataset = read_problems(datasetFile)
+    with open(outputjsonFile, "r") as fp:
+        outputjson = json.load(fp)
+    r = executeLLMProposalWorker(dataset,outputjson,Tid,condTy,proposalIndex,tc)
+    return r
+
+def executeLLMProposalWorker(dataset:Dict, outputjson:Dict, Tid:str, condTy:str, proposalIndex:int, tc:list):
+    """
+    This is the worker-function of executeLLMProposal. You can pass the jsons to this worker-function,
+    so if you call it multiple times you don't have to keep reading them from their files.
+    """
+    T = dataset[Tid]
     fx = f"{condTy}_condition_incomplete"
     if not (fx in T) or T[fx] == None or T[fx] == "" : return None
     header0 = T[fx]
@@ -331,17 +369,17 @@ def executeLLMProposal(datasetFile:str, outputjsonFile:str, Tid:str, condTy:str,
     funcName = f"check_{condTy}_{Tid}_{proposalIndex}"  
     funcHeader = "def " + funcName + params
 
-    with open(outputjsonFile, "r") as fp:
-        results = json.load(fp)
-    
-    for R in results:
+    for R in outputjson:
         if R["task_id"] == Tid:
             completions = R[condTy + "_condition_completions"]
             body = completions[proposalIndex]
             if body == None or body == "" : return None
-            funcDef = funcHeader + "\n" + body + "\n"
+            #funcDummyDef = funcHeader + "\n   raise(\"dummy function invoked!\")"
+            funcDef      = funcHeader + "\n" + body + "\n"
             print(funcDef)
             try :
+                # do the dummy-def first to make sure that we wipe previous def.
+                #exec(funcDummyDef,globals())
                 exec(funcDef,globals())
             except:
                 print(f">>> Fail to load the definition of {proposalIndex}-th proposal of {condTy}-cond of {Tid}")
@@ -350,8 +388,36 @@ def executeLLMProposal(datasetFile:str, outputjsonFile:str, Tid:str, condTy:str,
             #eval(f"{funcName}(*{tc})")
             r = eval(f"{funcName}(*tc)")
             return r
-
     return None
+
+def executeExternalSuite(datasetFile:str, outputjsonFile:str, condTy:str, suitename:str, testsuite:Dict):
+    dataset = read_problems(datasetFile)
+    with open(outputjsonFile, "r") as fp:
+        outputjson = json.load(fp)
+    all_test_results = {}
+    for Tid in dataset:
+        T_suite = testsuite[Tid]
+        solution_test_results = []
+        for tc in T_suite:
+            # run the tc on the solution pre/post-cond:
+            result1 = executeSolutionPrePostCondWorker(dataset,Tid,condTy,tc)
+            solution_test_results.append(result1)
+        llm_proposals = outputjson[f"{condTy}_condition_completions"]
+        llm_test_results = []
+        for k in range(0,len(llm_proposals)):
+            proposal_k_results = []
+            for (tc, expected) in zip(T_suite, solution_test_results) :
+                r = executeLLMProposalWorker(dataset,outputjson,Tid,condTy,k,tc)
+                tag = "positive" if expected == True else "negative"
+                proposal_k_results.append({
+                    "suite" : f"{suitename}_{tag}"
+                    "test"  : f"{tc}"
+                    "result" : r
+                    "expected" : expected
+                })
+            llm_test_results.append(proposal_k_results)
+        all_test_results[Tid] = llm_test_results
+    return all_test_results
 
 
 
@@ -360,14 +426,17 @@ if __name__ == '__main__':
    ROOT = os.path.dirname(os.path.abspath(__file__))
    dataset = os.path.join(ROOT, "..", "..", "llm4spiDatasets", "data", "HEx-compact.json")
    outputjson = os.path.join(ROOT, "results", "bla_all_usePrgDesc_04_02_2025_17_16_45.json")
-   outputjson = os.path.join(ROOT, "results", "claude-3_all_usePrgDesc_27_02_2025_17_51_06.json")
+   #outputjson = os.path.join(ROOT, "results", "claude-3_all_usePrgDesc_27_02_2025_17_51_06.json")
    testreultsjson = os.path.join(ROOT, "results", "testResults_claude-3_all_usePrgDesc_27_02_2025_17_51_06.json")
    odir = os.path.join(ROOT, "results")
 
    #exportOutLLMProposals(dataset,outputjson,odir)
 
-   #r = executeLLMProposal(dataset,outputjson,"HE1","post",0,[["()","()"],"()()"])
-   #print(r)
+   r = executeLLMProposal(dataset,outputjson,"HE1","post",0,[["()","()"],"()()"])
+   print(r)
+
+   r = executeSolutionPrePostCond(dataset,"HE1","post",[["()","()"],"()()"])
+   print(r)
 
    #exportLLMPTestResults(dataset,outputjson,odir)
-   analyzeTestResults(testreultsjson,odir)
+   #analyzeTestResults(testreultsjson,odir)
