@@ -4,8 +4,22 @@ import csv
 from typing import Dict
 from postAnalysisUtils import exportLLMPTestResults, analyzeTestResults, extendTestResultsWithExternalSuite
 
-def postMortem1(datasetFile:str, dirInputJsons:str,  additionalTestsFile:str, dirToPutOutputFiles:str):
-    print("** ==== Start post-mortem-1")
+def collectTestResults(datasetFile:str, dirInputJsons:str,  additionalTestsFile:str, dirToPutOutputFiles:str):
+    '''
+    Collect test results from the original LLMs evaluation into separate test-result files.
+    If additional-tests are given, they will be run and the results added into the output-files.
+
+    Test-results are put in files startwith testResult_ per json-file of the orginal LLM evaluation.
+    If additional tests are give, files starting with extendedtestResults_ are generated.
+    They contain test-results in the corresponding testResults_ file, plus the results of
+    additional tests.
+
+    * datasetFile: the json-file that describes the data/problem-set.
+    * dirInputJsons: directory containing tje json-outputs of the orginal LLMs evaluation on the dataset.
+    * additionalTestsFile: if specified (not None), this is a file containing additional tests for each problem in the dataset.
+    * dirToPutOutputFiles: directory where to put the output files of this function.
+    '''
+    print("** ==== Start collecting test results.")
     print("** Collecting test-results, reorganizing the data, saving them to testResults-files ...")
     k = 0
     preconds_summaries = []
@@ -32,24 +46,9 @@ def postMortem1(datasetFile:str, dirInputJsons:str,  additionalTestsFile:str, di
                                           "pynguin",
                                           additionalTestsFile,
                                           dirToPutOutputFiles)
+        print(f"** adding external tests done.")
+    print(f"** ==== Done.")
 
-    print("** Analyzing test-results ...")
-    k = 0
-    summaries = []
-    for file in Path(dirToPutOutputFiles).iterdir():  
-        baseName = os.path.basename(file)
-        if file.is_file() and file.suffix == ".json" and baseName.startswith("testResults_") :  
-            baseName = os.path.basename(file)
-            baseName = os.path.splitext(baseName)[0]
-            print("   > " + baseName)
-            A = analyzeTestResults(file,dirToPutOutputFiles)
-            summaries.append(A)
-            k += 1
-    print(f"** #testResults-files proecessed: {k}" )
-    print("** Exporting summaries to csv...")
-    summaries2csv(summaries,"pre",dirToPutOutputFiles)
-    summaries2csv(summaries,"post",dirToPutOutputFiles)
-    print(f"** ==== done")
 
 def summaries2csv(summaries,cond,dirToPutOutputFile):
     table = []
@@ -78,7 +77,27 @@ def summaries2csv(summaries,cond,dirToPutOutputFile):
         for row in table:
             writer.writerow(row.values())  
 
-
+def postmortem_analysis1(dirOfTestResultFiles:str, withExternalResults:bool = False):
+    print(f"** ==== Start post-mortem analysis 1 {dirOfTestResultFiles}")
+    print("** Analyzing test-results ...")
+    k = 0
+    summaries = []
+    for file in Path(dirOfTestResultFiles).iterdir():  
+        baseName = os.path.basename(file)
+        if file.is_file() and file.suffix == ".json" :  
+            if (   (withExternalResults==False and baseName.startswith("testResults_"))
+                or (withExternalResults==True  and baseName.startswith("extendedtestResults_"))):
+               baseName = os.path.basename(file)
+               baseName = os.path.splitext(baseName)[0]
+               print("   > " + baseName)
+               A = analyzeTestResults(file,dirOfTestResultFiles)
+               summaries.append(A)
+               k += 1
+    print(f"** #testResults-files proecessed: {k}" )
+    print("** Exporting summaries to csv...")
+    summaries2csv(summaries,"pre",dirOfTestResultFiles)
+    summaries2csv(summaries,"post",dirOfTestResultFiles)
+    print(f"** ==== Done")
 
 
 # example use:
@@ -88,4 +107,6 @@ if __name__ == '__main__':
    additionalTests = os.path.join(ROOT, "results","coba-postmortem","pynguin_hex_generatedTests.json")
    idir = os.path.join(ROOT, "results","coba-postmortem","fromLLMs")
    odir = os.path.join(ROOT, "results","coba-postmortem","postmortem")
-   postMortem1(dataset,idir,additionalTests,odir)
+   #collectTestResults(dataset,idir,additionalTests,odir)
+   print(f"### {odir}")
+   postmortem_analysis1(odir,True)
