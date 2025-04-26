@@ -1,10 +1,14 @@
 import json
-from data import read_problems, write_json
 import os.path
 import statistics
-from basicEvaluate import extractTests, compare_results
+from func_timeout import func_timeout, FunctionTimedOut
 from typing import Dict
 
+from data import read_problems, write_json
+import myconfig
+from basicEvaluate import extractTests, compare_results
+
+DEBUG = False
 
 def exportOutLLMProposals(datasetFile:str, outputjsonFile:str, dirToPutGeneratedPy:str):
     """
@@ -250,21 +254,30 @@ def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
     """
 
     # we choose several test suites here:
-    fsuite_HP   = lambda S : [ t for t in S if t["suite"] == "human-positive"]
-    fsuite_HN   = lambda S : [ t for t in S if t["suite"] == "human-negative"]
-    fsuite_HPN  = lambda S : fsuite_HP(S) + fsuite_HN(S)
-    fsuite_HV   = lambda S : [ t for t in S if t["suite"] == "human-validation"]
-    fsuite_HAll = lambda S : fsuite_HPN(S) + fsuite_HV(S)
+    fsuite_HuP   = lambda S : [ t for t in S if t["suite"] == "human-positive"]
+    fsuite_HuN   = lambda S : [ t for t in S if t["suite"] == "human-negative"]
+    fsuite_HuPN  = lambda S : fsuite_HuP(S) + fsuite_HuN(S)
+    fsuite_HuV   = lambda S : [ t for t in S if t["suite"] == "human-validation"]
+    fsuite_HuAll = lambda S : fsuite_HuPN(S) + fsuite_HuV(S)
+    fsuite_PyP   = lambda S : [ t for t in S if t["suite"] == "pynguin-positive"]
+    fsuite_PyN   = lambda S : [ t for t in S if t["suite"] == "pynguin-negative"]
+    fsuite_PyAll = lambda S : fsuite_PyP(S) + fsuite_PyN(S)
+    fsuite_HuPyP = lambda S : fsuite_HuP(S) + fsuite_PyP(S)
+    fsuite_HuPyPNPN = lambda S : fsuite_HuPN(S) + fsuite_PyP(S) + fsuite_PyN(S)
+    fsuite_All      = lambda S : fsuite_HuAll(S) + fsuite_PyAll(S)
     
     results_preconds = [
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "human-positive", fsuite_HP),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "human-all", fsuite_HAll)
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "human-positive", fsuite_HuP),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "human-all", fsuite_HuAll),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "all", fsuite_All)
     ]
 
     results_postconds = [
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-positive", fsuite_HP),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-set1", fsuite_HPN),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-all", fsuite_HAll)
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-positive", fsuite_HuP),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-set1", fsuite_HuPN),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-all", fsuite_HuAll),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "positive", fsuite_HuPyP),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "all", fsuite_All)
     ]
 
     def topLevelSummries(data): 
@@ -374,12 +387,12 @@ def executeLLMProposalWorker(dataset:Dict, outputjson:Dict, Tid:str, condTy:str,
             completions = R[condTy + "_condition_completions"]
             body = completions[proposalIndex]
             if body == None or body == "" : return None
-            #funcDummyDef = funcHeader + "\n   raise(\"dummy function invoked!\")"
+            funcDummyDef = funcHeader + "\n   raise(\"dummy function invoked!\")"
             funcDef      = funcHeader + "\n" + body + "\n"
-            print(funcDef)
+            if DEBUG: print(funcDef)
             try :
                 # do the dummy-def first to make sure that we wipe previous def.
-                #exec(funcDummyDef,globals())
+                exec(funcDummyDef,globals())
                 exec(funcDef,globals())
             except:
                 print(f">>> Fail to load the definition of {proposalIndex}-th proposal of {condTy}-cond of {Tid}")
@@ -390,53 +403,166 @@ def executeLLMProposalWorker(dataset:Dict, outputjson:Dict, Tid:str, condTy:str,
             return r
     return None
 
-def executeExternalSuite(datasetFile:str, outputjsonFile:str, condTy:str, suitename:str, testsuite:Dict):
+
+def executeExternalSuite(datasetFile:str, outputjsonFile:str, suitename:str, testsuiteJsonFile:str):
+    """
+    Execute external test-suites and return the resulting test-results on all LLM pre/post candidates
+    in the outputjsonFile. 
+    
+    The suitename specifies how the suites will be named in the resulting list of test-results.
+    """
+    with open(testsuiteJsonFile, "r") as fp:
+        testsuite = json.load(fp)
+
+    def getTestSuite(str):
+        if str == []: 
+            return []
+        return eval(str)
+
+    # we'll just merge the positive and negative tests; we will re-check the polarity later and
+    # re-assign the polarity accordingly:
+    testsuite_pre  = { task["problemId"] : getTestSuite(task[f"positive_pre_tests"]) + getTestSuite(task[f"negative_pre_tests"])
+                       for task in testsuite}
+    testsuite_post = { task["problemId"] : getTestSuite(task[f"positive_post_tests"]) + getTestSuite(task[f"negative_post_tests"])
+                       for task in testsuite}
+    print(f"** #problems for precond with some tests: {len([1 for s in testsuite_pre.values() if s != []])}")
+    for Tid in testsuite_pre:
+        P = testsuite_pre[Tid]
+        print(f"  {Tid} #precond tests: {len(P)}")
+    print(f"** #problems for postcond with some tests: {len([1 for s in testsuite_post.values() if s != []])}")
+    for Tid in testsuite_post:
+        P = testsuite_post[Tid]
+        print(f"  {Tid} #postcond tests: {len(P)}")
+        
+    S1 = executeExternalSuiteWorker(datasetFile,outputjsonFile,"pre",suitename,testsuite_pre)
+    S2 = executeExternalSuiteWorker(datasetFile,outputjsonFile,"post",suitename,testsuite_post)
+    return (S1,S2)
+
+    
+
+def executeExternalSuiteWorker(datasetFile:str, outputjsonFile:str, 
+                               condTy:str, # pre or post
+                               suitename:str, testsuite:Dict):
+    """
+    Worker of executeExternalSuite. The external test suites to execute are given as a dictionary.
+    """
     dataset = read_problems(datasetFile)
     with open(outputjsonFile, "r") as fp:
         outputjson = json.load(fp)
+    outputjsonDict = { task["task_id"] : task for task in outputjson }
     all_test_results = {}
     for Tid in dataset:
+        llm_proposals = outputjsonDict[Tid][f"{condTy}_condition_completions"]
+        if llm_proposals == None:
+            continue
         T_suite = testsuite[Tid]
+        if len(T_suite) == 0:
+            continue
+
         solution_test_results = []
         for tc in T_suite:
             # run the tc on the solution pre/post-cond:
+            # hmm... should add timeout here?
             result1 = executeSolutionPrePostCondWorker(dataset,Tid,condTy,tc)
             solution_test_results.append(result1)
-        llm_proposals = outputjson[f"{condTy}_condition_completions"]
+        
         llm_test_results = []
         for k in range(0,len(llm_proposals)):
             proposal_k_results = []
             for (tc, expected) in zip(T_suite, solution_test_results) :
-                r = executeLLMProposalWorker(dataset,outputjson,Tid,condTy,k,tc)
+                try:
+                    print(f">>> about to execute {k}-th proposal of {condTy}-cond of {Tid}")
+                    # r = executeLLMProposalWorker(dataset,outputjson,Tid,condTy,k,tc)
+                    # run it with timeout:
+                    result = func_timeout(myconfig.RUN_SINGLE_TESTCASE_TIMEOUT, 
+                                          executeLLMProposalWorker, 
+                                          args=[dataset,outputjson,Tid,condTy,k,tc])
+                    print(">>> exec-done")
+                    if (r==None) or (type(r) != bool) : 
+                        r = "not a bool"
+                    ## DEBUG:
+                    #r = "failed" 
+                except FunctionTimedOut:
+                    if DEBUG: print(f">>> {k}-th proposal of {condTy}-cond of {Tid} timed-out on input {tc}")  
+                    r = "timeout"
+                except:
+                    if DEBUG: print(f">>> {k}-th proposal of {condTy}-cond of {Tid} crashed on input {tc}")  
+                    r = "failed" 
                 tag = "positive" if expected == True else "negative"
                 proposal_k_results.append({
-                    "suite" : f"{suitename}_{tag}"
-                    "test"  : f"{tc}"
-                    "result" : r
+                    "suite" : f"{suitename}_{tag}",
+                    "test"  : f"{tc}",
+                    "result" : r,
                     "expected" : expected
                 })
             llm_test_results.append(proposal_k_results)
         all_test_results[Tid] = llm_test_results
     return all_test_results
 
+def extendTestResultsWithExternalSuite(datasetFile:str, 
+                                       outputjsonFile:str, 
+                                       baseTestResultsJsonFile:str,
+                                       suitename:str, 
+                                       testsuiteJsonFile:str,
+                                       dirToPutOutputFile:str):
+    
+    """
+    Extend existing test-results with additional tests.
+    """
+    with open(baseTestResultsJsonFile, "r") as ftr:
+        baseTestResults = json.load(ftr)
+        baseTestResultsDict = { T["task_id"] : T  for T in baseTestResults }
 
+    def extend(newtests, condTy):
+        for Tid in newtests:
+            baseTest = baseTestResultsDict[Tid]
+            if newtests[Tid] == []: continue
+            if baseTest[f"{condTy}_condition"] == None:
+               baseTest[f"{condTy}_condition"] = newtests[Tid]
+            else:        
+               baseTest[f"{condTy}_condition"] =  [ S1 + S2 for (S1,S2) in zip(baseTest[f"{condTy}_condition"],newtests[Tid]) ]
+
+    (precond_tests, postcond_tests) = executeExternalSuite(datasetFile,outputjsonFile,suitename,testsuiteJsonFile)
+    extend(precond_tests, "pre")
+    extend(postcond_tests, "post")
+
+    extendedTestResults = baseTestResults
+    # save the extended test-suites
+    testResultsJsonFile_BaseName = os.path.basename(baseTestResultsJsonFile)
+    file = os.path.join(dirToPutOutputFile, "extended" + testResultsJsonFile_BaseName)
+    write_json(file, extendedTestResults)
+    return extendedTestResults
 
 # example use:
 if __name__ == '__main__':
    ROOT = os.path.dirname(os.path.abspath(__file__))
    dataset = os.path.join(ROOT, "..", "..", "llm4spiDatasets", "data", "HEx-compact.json")
    outputjson = os.path.join(ROOT, "results", "bla_all_usePrgDesc_04_02_2025_17_16_45.json")
-   #outputjson = os.path.join(ROOT, "results", "claude-3_all_usePrgDesc_27_02_2025_17_51_06.json")
+   outputjson2 = os.path.join(ROOT, "results", "claude-3_all_usePrgDesc_27_02_2025_17_51_06.json")
    testreultsjson = os.path.join(ROOT, "results", "testResults_claude-3_all_usePrgDesc_27_02_2025_17_51_06.json")
    odir = os.path.join(ROOT, "results")
 
    #exportOutLLMProposals(dataset,outputjson,odir)
 
-   r = executeLLMProposal(dataset,outputjson,"HE1","post",0,[["()","()"],"()()"])
-   print(r)
+   #r = executeLLMProposal(dataset,outputjson,"HE1","post",0,[["()","()"],"()()"])
+   #print(r)
 
-   r = executeSolutionPrePostCond(dataset,"HE1","post",[["()","()"],"()()"])
-   print(r)
+   #r = executeSolutionPrePostCond(dataset,"HE1","post",[["()","()"],"()()"])
+   #print(r)
+
+   #r = executeExternalSuite(dataset,outputjson2,"pynguin",os.path.join(ROOT, "results", "coba-postmortem","pynguin_hex_generatedTests.json"))
+   #r0 = r[1]["HE101"]
+   #print(f">>> {r0}")
+
+   r = extendTestResultsWithExternalSuite(dataset,
+                                          outputjson2,
+                                          testreultsjson,
+                                          "pynguin",
+                                          os.path.join(ROOT, "results", "coba-postmortem","pynguin_hex_generatedTests.json"),
+                                          os.path.join(ROOT, "results"))
+
+   r0 ={ T["task_id"] : T for T in r }["HE101"]
+   print(f">>> {r0}")
 
    #exportLLMPTestResults(dataset,outputjson,odir)
    #analyzeTestResults(testreultsjson,odir)

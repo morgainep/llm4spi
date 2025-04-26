@@ -2,9 +2,9 @@ import os
 from pathlib import Path 
 import csv
 from typing import Dict
-from postAnalysisUtils import exportLLMPTestResults, analyzeTestResults
+from postAnalysisUtils import exportLLMPTestResults, analyzeTestResults, extendTestResultsWithExternalSuite
 
-def postMortem1(datasetFile:str, dirInputJsons:str,  dirToPutOutputFiles:str):
+def postMortem1(datasetFile:str, dirInputJsons:str,  additionalTestsFile:str, dirToPutOutputFiles:str):
     print("** ==== Start post-mortem-1")
     print("** Collecting test-results, reorganizing the data, saving them to testResults-files ...")
     k = 0
@@ -18,6 +18,20 @@ def postMortem1(datasetFile:str, dirInputJsons:str,  dirToPutOutputFiles:str):
             exportLLMPTestResults(datasetFile,file,dirToPutOutputFiles)
             k += 1
     print(f"** #input-files proecessed: {k}" )
+
+    if additionalTestsFile != None:
+        print("** Adding external tests ...")
+        for file in Path(dirInputJsons).iterdir():  
+            if file.is_file() and file.suffix == ".json" : 
+                baseName = os.path.basename(file)
+                baseName = os.path.splitext(baseName)[0]
+                baseTestResultsFile = os.path.join(dirToPutOutputFiles, "testResults_" + baseName + ".json")
+                extendTestResultsWithExternalSuite(datasetFile,
+                                          file,
+                                          baseTestResultsFile,
+                                          "pynguin",
+                                          additionalTestsFile,
+                                          dirToPutOutputFiles)
 
     print("** Analyzing test-results ...")
     k = 0
@@ -71,6 +85,7 @@ def summaries2csv(summaries,cond,dirToPutOutputFile):
 if __name__ == '__main__':
    ROOT = os.path.dirname(os.path.abspath(__file__))
    dataset = os.path.join(ROOT, "..", "..", "llm4spiDatasets", "data", "HEx-compact.json")
+   additionalTests = os.path.join(ROOT, "results","coba-postmortem","pynguin_hex_generatedTests.json")
    idir = os.path.join(ROOT, "results","coba-postmortem","fromLLMs")
    odir = os.path.join(ROOT, "results","coba-postmortem","postmortem")
-   postMortem1(dataset,idir,odir)
+   postMortem1(dataset,idir,additionalTests,odir)
