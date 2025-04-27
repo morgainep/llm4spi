@@ -208,8 +208,8 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
         numOfWeaklyAccepted = len([ 1 for v in T_verdicts if v["verdict"] in ["accepted", "too_strong", "too_weak" ]])
         averageTCsPassRate = statistics.mean([ 0 if v["#tests"]==0 else v["#passed"]/v["#tests"] for v in T_verdicts ])
         numberOfCandidates = len(taskTestResults)
-        numberOfTests = T_verdicts[0]["#tests"]
-        
+        #numberOfTests = T_verdicts[0]["#tests"]
+        numberOfTests = statistics.mean([ v["#tests"] for v in T_verdicts ]) 
         Z = {
             "task_id" : tId,
             "testsuite-name" : suiteName,
@@ -483,8 +483,6 @@ def executeExternalSuiteWorker(datasetFile:str, outputjsonFile:str,
                     print(">>> exec-done")
                     if (r==None) or (type(r) != bool) : 
                         r = "not a bool"
-                    ## DEBUG:
-                    #r = "failed" 
                 except FunctionTimedOut:
                     if DEBUG: print(f">>> {k}-th proposal of {condTy}-cond of {Tid} timed-out on input {tc}")  
                     r = "timeout"
@@ -516,7 +514,7 @@ def extendTestResultsWithExternalSuite(datasetFile:str,
         baseTestResults = json.load(ftr)
         baseTestResultsDict = { T["task_id"] : T  for T in baseTestResults }
 
-    def extend(newtests, condTy):
+    def extendWith(newtests, condTy):
         for Tid in newtests:
             baseTest = baseTestResultsDict[Tid]
             if newtests[Tid] == []: continue
@@ -526,8 +524,8 @@ def extendTestResultsWithExternalSuite(datasetFile:str,
                baseTest[f"{condTy}_condition"] =  [ S1 + S2 for (S1,S2) in zip(baseTest[f"{condTy}_condition"],newtests[Tid]) ]
 
     (precond_tests, postcond_tests) = executeExternalSuite(datasetFile,outputjsonFile,suitename,testsuiteJsonFile)
-    extend(precond_tests, "pre")
-    extend(postcond_tests, "post")
+    extendWith(precond_tests, "pre")
+    extendWith(postcond_tests, "post")
 
     extendedTestResults = baseTestResults
     # save the extended test-suites
