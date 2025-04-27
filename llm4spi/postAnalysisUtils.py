@@ -208,6 +208,7 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
         numOfWeaklyAccepted = len([ 1 for v in T_verdicts if v["verdict"] in ["accepted", "too_strong", "too_weak" ]])
         averageTCsPassRate = statistics.mean([ 0 if v["#tests"]==0 else v["#passed"]/v["#tests"] for v in T_verdicts ])
         numberOfCandidates = len(taskTestResults)
+        numberOfTests = T_verdicts[0]["#tests"]
         
         Z = {
             "task_id" : tId,
@@ -218,7 +219,8 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
             "weaklyaccepted@1" : numOfWeaklyAccepted/numberOfCandidates,
             "acceptedAtLeastOne" : numOfAccepted>0,
             "weaklyacceptedAtLeastOne" : numOfWeaklyAccepted>0,
-            "averageTCsPassRate" : averageTCsPassRate
+            "averageTCsPassRate" : averageTCsPassRate,
+            "#tests" : numberOfTests
         }
         # collect the summaries:
         perTask_summaries.append(Z)
@@ -235,7 +237,8 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
         "avrg_weaklyaccepted@1" : statistics.mean([T["weaklyaccepted@1"] for T in perTask_summaries]),
         "acceptedAtLeastOne_percentage" : statistics.mean([1 if T["acceptedAtLeastOne"]==True else 0 for T in perTask_summaries ]),
         "weaklyacceptedAtLeastOne_percentage" : statistics.mean([1 if T["weaklyacceptedAtLeastOne"]==True else 0 for T in perTask_summaries ]),
-        "averageTCsPassRate" : statistics.mean([T["averageTCsPassRate"] for T in perTask_summaries])
+        "averageTCsPassRate" : statistics.mean([T["averageTCsPassRate"] for T in perTask_summaries]),
+        "tot #tests" : sum([T["#tests"] for T in perTask_summaries])
         }
         # per-task-summaries:
         , perTask_summaries
@@ -259,8 +262,8 @@ def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
     fsuite_HuPN  = lambda S : fsuite_HuP(S) + fsuite_HuN(S)
     fsuite_HuV   = lambda S : [ t for t in S if t["suite"] == "human-validation"]
     fsuite_HuAll = lambda S : fsuite_HuPN(S) + fsuite_HuV(S)
-    fsuite_PyP   = lambda S : [ t for t in S if t["suite"] == "pynguin-positive"]
-    fsuite_PyN   = lambda S : [ t for t in S if t["suite"] == "pynguin-negative"]
+    fsuite_PyP   = lambda S : [ t for t in S if t["suite"] == "pynguin_positive"]
+    fsuite_PyN   = lambda S : [ t for t in S if t["suite"] == "pynguin_negative"]
     fsuite_PyAll = lambda S : fsuite_PyP(S) + fsuite_PyN(S)
     fsuite_HuPyP = lambda S : fsuite_HuP(S) + fsuite_PyP(S)
     fsuite_HuPyPNPN = lambda S : fsuite_HuPN(S) + fsuite_PyP(S) + fsuite_PyN(S)
@@ -474,9 +477,9 @@ def executeExternalSuiteWorker(datasetFile:str, outputjsonFile:str,
                     print(f">>> about to execute {k}-th proposal of {condTy}-cond of {Tid}")
                     # r = executeLLMProposalWorker(dataset,outputjson,Tid,condTy,k,tc)
                     # run it with timeout:
-                    result = func_timeout(myconfig.RUN_SINGLE_TESTCASE_TIMEOUT, 
-                                          executeLLMProposalWorker, 
-                                          args=[dataset,outputjson,Tid,condTy,k,tc])
+                    r = func_timeout(myconfig.RUN_SINGLE_TESTCASE_TIMEOUT, 
+                                     executeLLMProposalWorker, 
+                                     args=[dataset,outputjson,Tid,condTy,k,tc])
                     print(">>> exec-done")
                     if (r==None) or (type(r) != bool) : 
                         r = "not a bool"
@@ -539,30 +542,37 @@ if __name__ == '__main__':
    dataset = os.path.join(ROOT, "..", "..", "llm4spiDatasets", "data", "HEx-compact.json")
    outputjson = os.path.join(ROOT, "results", "bla_all_usePrgDesc_04_02_2025_17_16_45.json")
    outputjson2 = os.path.join(ROOT, "results", "claude-3_all_usePrgDesc_27_02_2025_17_51_06.json")
+   outputjson3 = os.path.join(ROOT, "results", "gpt-4o_all_usePrgDesc_03_02_2025_22_18_27.json")
    testreultsjson = os.path.join(ROOT, "results", "testResults_claude-3_all_usePrgDesc_27_02_2025_17_51_06.json")
    odir = os.path.join(ROOT, "results")
 
    #exportOutLLMProposals(dataset,outputjson,odir)
 
-   #r = executeLLMProposal(dataset,outputjson,"HE1","post",0,[["()","()"],"()()"])
-   #print(r)
-
    #r = executeSolutionPrePostCond(dataset,"HE1","post",[["()","()"],"()()"])
    #print(r)
+   r = executeSolutionPrePostCond(dataset,"HE0","post",[False, [3550], 3550])
+   print(r)
+
+   #r = executeLLMProposal(dataset,outputjson,"HE1","post",0,[["()","()"],"()()"])
+   #print(r)
+   r = executeLLMProposal(dataset,outputjson3,"HE0","post",0,[False, [3550], 3550])
+   print(r)
+   r = executeLLMProposal(dataset,outputjson3,"HE0","post",0,[False, [False, True, False, False], True])
+   print(r)
 
    #r = executeExternalSuite(dataset,outputjson2,"pynguin",os.path.join(ROOT, "results", "coba-postmortem","pynguin_hex_generatedTests.json"))
    #r0 = r[1]["HE101"]
    #print(f">>> {r0}")
 
-   r = extendTestResultsWithExternalSuite(dataset,
-                                          outputjson2,
-                                          testreultsjson,
-                                          "pynguin",
-                                          os.path.join(ROOT, "results", "coba-postmortem","pynguin_hex_generatedTests.json"),
-                                          os.path.join(ROOT, "results"))
-
-   r0 ={ T["task_id"] : T for T in r }["HE101"]
-   print(f">>> {r0}")
+   #r = extendTestResultsWithExternalSuite(dataset,
+   #                                       outputjson2,
+   #                                       testreultsjson,
+   #                                       "pynguin",
+   #                                       os.path.join(ROOT, "results", "coba-postmortem","pynguin_hex_generatedTests.json"),
+   #                                       os.path.join(ROOT, "results"))
+   #
+   #r0 ={ T["task_id"] : T for T in r }["HE101"]
+   #print(f">>> {r0}")
 
    #exportLLMPTestResults(dataset,outputjson,odir)
    #analyzeTestResults(testreultsjson,odir)

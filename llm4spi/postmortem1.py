@@ -66,6 +66,7 @@ def summaries2csv(summaries,cond,dirToPutOutputFile):
             data2[suiteName+"_acceptedAtLeastOne_percentage"] = X["acceptedAtLeastOne_percentage"]
             data2[suiteName+"_weaklyacceptedAtLeastOne_percentage"] = X["weaklyacceptedAtLeastOne_percentage"]
             data2[suiteName+"_averageTCsPassRate"]= X["averageTCsPassRate"]
+            data2[suiteName+"_totNumOftests"]= X["tot #tests"]
         table.append(data2)
         
     if len(table) == 0: return
@@ -108,5 +109,5 @@ if __name__ == '__main__':
    idir = os.path.join(ROOT, "results","coba-postmortem","fromLLMs")
    odir = os.path.join(ROOT, "results","coba-postmortem","postmortem")
    #collectTestResults(dataset,idir,additionalTests,odir)
-   print(f"### {odir}")
+   #print(f"### {odir}")
    postmortem_analysis1(odir,True)
