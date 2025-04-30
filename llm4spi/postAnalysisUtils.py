@@ -212,6 +212,7 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
         numberOfTests = statistics.mean([ v["#tests"] for v in T_verdicts ]) 
         Z = {
             "task_id" : tId,
+            "cond-type" : f"{condition}_condition",
             "testsuite-name" : suiteName,
             "numOfAccepted" : numOfAccepted,
             "numOfWeaklyAccepted" : numOfWeaklyAccepted,
@@ -283,16 +284,40 @@ def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
         analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "all", fsuite_All)
     ]
 
+    results_both_conditions = [
+        (results_preconds[0],results_postconds[0]), # human-positive
+        (results_preconds[1],results_postconds[2]), # human-all
+        (results_preconds[2],results_postconds[4]), # all (human-all + extras)
+    ]
+
     def topLevelSummries(data): 
-        return [ r[0] for r in data if r != None]
+        return [ r[0] for r in data ]
+    
+    def topLevelSummriesOfCombinedPrePost(dataCombined):
+       Z = [ precondData[1] + postcondData[1] for (precondData,postcondData) in dataCombined ]
+       return [ 
+              # top-level summary:
+              { "cond-type"       : "both",
+                "testsuite-name"  : task_summaries[0]["testsuite-name"],
+                "#tasks"          : len(task_summaries),
+                "avrg_accepted@1"       : statistics.mean([T["accepted@1"] for T in task_summaries]),
+                "avrg_weaklyaccepted@1" : statistics.mean([T["weaklyaccepted@1"] for T in task_summaries]),
+                "acceptedAtLeastOne_percentage" : statistics.mean([1 if T["acceptedAtLeastOne"]==True else 0 for T in task_summaries ]),
+                "weaklyacceptedAtLeastOne_percentage" : statistics.mean([1 if T["weaklyacceptedAtLeastOne"]==True else 0 for T in task_summaries ]),
+                "averageTCsPassRate" : statistics.mean([T["averageTCsPassRate"] for T in task_summaries]),
+                "tot #tests" : sum([T["#tests"] for T in task_summaries])
+             }
+        for task_summaries in Z ]
+       
     def perTaskSummaries(data):
         return [ { "testsuite-name" : r[0]["testsuite-name"],
                    "results" : r[1] } 
-                   for r in data if r != None]
+                   for r in data ]
+    
     def rawVerdicts(data):
         return [ { "testsuite-name" : r[0]["testsuite-name"],
                    "verdicts" : r[2] } 
-                   for r in data if r != None]
+                   for r in data ]
     
     # we now save the analysis into files
     testResultsJsonFile_BaseName = os.path.basename(testResultsJsonFile)
@@ -302,21 +327,27 @@ def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
 
     file = os.path.join(dirToPutOutputFiles, "preCondAnalysisSummary_" + outputfileBaseName + ".json")
     write_json(file, topLevelSummries(results_preconds))
-    file = os.path.join(dirToPutOutputFiles, "preCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".json")
-    write_json(file, perTaskSummaries(results_preconds))
-    file = os.path.join(dirToPutOutputFiles, "preCondAnalysisRawVerdicts_" + outputfileBaseName + ".json")
-    write_json(file, rawVerdicts(results_preconds))
-
     file = os.path.join(dirToPutOutputFiles, "postCondAnalysisSummary_" + outputfileBaseName + ".json")
     write_json(file, topLevelSummries(results_postconds))
+    file = os.path.join(dirToPutOutputFiles, "bothCondsAnalysisSummary_" + outputfileBaseName + ".json")
+    write_json(file, topLevelSummriesOfCombinedPrePost(results_both_conditions))
+
+    file = os.path.join(dirToPutOutputFiles, "preCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".json")
+    write_json(file, perTaskSummaries(results_preconds))
     file = os.path.join(dirToPutOutputFiles, "postCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".json")
     write_json(file, perTaskSummaries(results_postconds))
+
+    file = os.path.join(dirToPutOutputFiles, "preCondAnalysisRawVerdicts_" + outputfileBaseName + ".json")
+    write_json(file, rawVerdicts(results_preconds))
     file = os.path.join(dirToPutOutputFiles, "postCondAnalysisRawVerdicts_" + outputfileBaseName + ".json")
     write_json(file, rawVerdicts(results_postconds))
     
     #print (f"{topLevelSummries(results_postconds)}")
     
-    return (outputfileBaseName, topLevelSummries(results_preconds), topLevelSummries(results_postconds))
+    return (outputfileBaseName, 
+              topLevelSummries(results_preconds), 
+              topLevelSummries(results_postconds),
+              topLevelSummriesOfCombinedPrePost(results_both_conditions))
 
        
 def executeSolutionPrePostCond(datasetFile:str, Tid:str, condTy:str, tc:list):

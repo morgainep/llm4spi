@@ -56,8 +56,10 @@ def summaries2csv(summaries,cond,dirToPutOutputFile):
         baseName = Z[0]
         if cond=="pre":
             data = Z[1] # pre-cond data
-        else:
+        elif cond=="post":
             data = Z[2] # post-cond data
+        else:  # cond is "both"
+            data = Z[3]
         data2 = { "LLM" : baseName }
         for X in data:
             suiteName = X["testsuite-name"]
@@ -66,7 +68,7 @@ def summaries2csv(summaries,cond,dirToPutOutputFile):
             data2[suiteName+"_acceptedAtLeastOne_percentage"] = X["acceptedAtLeastOne_percentage"]
             data2[suiteName+"_weaklyacceptedAtLeastOne_percentage"] = X["weaklyacceptedAtLeastOne_percentage"]
             data2[suiteName+"_averageTCsPassRate"]= X["averageTCsPassRate"]
-            data2[suiteName+"_totNumOftests"]= X["tot #tests"]
+            #data2[suiteName+"_totNumOftests"]= X["tot #tests"]
         table.append(data2)
         
     if len(table) == 0: return
@@ -98,6 +100,7 @@ def postmortem_analysis1(dirOfTestResultFiles:str, withExternalResults:bool = Fa
     print("** Exporting summaries to csv...")
     summaries2csv(summaries,"pre",dirOfTestResultFiles)
     summaries2csv(summaries,"post",dirOfTestResultFiles)
+    summaries2csv(summaries,"both",dirOfTestResultFiles)
     print(f"** ==== Done")
 
 
