@@ -142,7 +142,9 @@ def exportLLMPTestResults(datasetFile:str, outputjsonFile:str, dirToPutOutputFil
 def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str, 
                                        condition:str, # pre or post
                                        suiteName:str, 
-                                       suiteSelectionFunction):
+                                       suiteSelectionFunction,
+                                       taskSelectionFunction
+                                       ):
 
     """
     Given a json-file containing tests-results as produce by the function exportLLMPTestResults(),
@@ -167,7 +169,9 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
     # drop tasks with empty results e.g. if we ask for pre-cond results,
     # but the task has no pre-cond
     allTestResults = [ taskResults for taskResults in allTestResults 
-                                   if taskResults[f"{condition}_condition"] != None ]
+                                   if taskResults[f"{condition}_condition"] != None 
+                                      and (taskSelectionFunction == None or taskSelectionFunction(condition,taskResults["task_id"]))
+                     ]
   
     numberOfTasks = len(allTestResults)
 
@@ -251,7 +255,10 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
 def analyzeTestResults(testResultsJsonFile:str, 
                        dirToPutOutputFiles:str,
                        savePerTaskSummaries:bool = True,
-                       saveWholeRawVerdictsData:bool = True):
+                       saveWholeRawVerdictsData:bool = True,
+                       taskSelectorName:str = None,
+                       taskSelectionFunction = None
+                       ):
     """
     Given a json-file containing tests-results as produce by the function exportLLMPTestResults(),
     this will calculate verdicts per candidate and produce per-task statistics and
@@ -260,6 +267,12 @@ def analyzeTestResults(testResultsJsonFile:str,
     Various analysis results are saved to files. Additionally, top-level statistics are 
     returned.
     """
+    if taskSelectionFunction != None and taskSelectorName == None:
+        raise Exception("## if taskSelectionFunction is specified, taskSelectorName should also be specified.")
+    
+    if taskSelectionFunction == None and taskSelectorName != None:
+        raise Exception("## if taskSelectorName is specified, taskSelectionFunction should also be specified.")
+    
 
     # we choose several test suites here:
     fsuite_HuP   = lambda S : [ t for t in S if t["suite"] == "human-positive"]
@@ -275,17 +288,17 @@ def analyzeTestResults(testResultsJsonFile:str,
     fsuite_All      = lambda S : fsuite_HuAll(S) + fsuite_PyAll(S)
     
     results_preconds = [
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "human-positive", fsuite_HuP),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "human-all", fsuite_HuAll),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "all", fsuite_All)
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "human-positive", fsuite_HuP, taskSelectionFunction),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "human-all", fsuite_HuAll, taskSelectionFunction),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "pre", "all", fsuite_All, taskSelectionFunction)
     ]
 
     results_postconds = [
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-positive", fsuite_HuP),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-set1", fsuite_HuPN),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-all", fsuite_HuAll),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "positive", fsuite_HuPyP),
-        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "all", fsuite_All)
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-positive", fsuite_HuP, taskSelectionFunction),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-set1", fsuite_HuPN, taskSelectionFunction),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "human-all", fsuite_HuAll, taskSelectionFunction),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "positive", fsuite_HuPyP, taskSelectionFunction),
+        analyzeTestResults_ofSelectedSuite(testResultsJsonFile, "post", "all", fsuite_All, taskSelectionFunction)
     ]
 
     results_both_conditions = [
@@ -295,10 +308,14 @@ def analyzeTestResults(testResultsJsonFile:str,
     ]
 
     def topLevelSummries(data): 
-        return [ r[0] for r in data ]
+        return [ r[0] if r != None else None   for r in data ] 
     
     def topLevelSummriesOfCombinedPrePost(dataCombined):
-       Z = [ precondData[1] + postcondData[1] for (precondData,postcondData) in dataCombined ]
+       Z = [ precondData[1] if precondData != None else []
+             + 
+             postcondData[1] if postcondData != None else []
+             for (precondData,postcondData) in dataCombined    ]
+       
        return [ 
               # top-level summary:
               { "cond-type"       : "both",
@@ -370,11 +387,16 @@ def analyzeTestResults(testResultsJsonFile:str,
     topLevelPreCondSummaries   = topLevelSummries(results_preconds)
     topLevelPostCondSummaries  = topLevelSummries(results_postconds)
     toplevelBothCondsSummaries = topLevelSummriesOfCombinedPrePost(results_both_conditions)
-    file = os.path.join(dirToPutOutputFiles, "preCondAnalysisSummary_" + outputfileBaseName + ".json")
+    if taskSelectorName == None: 
+        taskSelectorName = ""
+    else:
+        taskSelectorName = taskSelectorName + "_"
+
+    file = os.path.join(dirToPutOutputFiles, f"preCondAnalysisSummary_{taskSelectorName}" + outputfileBaseName + ".json")
     write_json(file,topLevelPreCondSummaries)
-    file = os.path.join(dirToPutOutputFiles, "postCondAnalysisSummary_" + outputfileBaseName + ".json")
+    file = os.path.join(dirToPutOutputFiles, f"postCondAnalysisSummary{taskSelectorName}" + outputfileBaseName + ".json")
     write_json(file,topLevelPostCondSummaries)
-    file = os.path.join(dirToPutOutputFiles, "bothCondsAnalysisSummary_" + outputfileBaseName + ".json")
+    file = os.path.join(dirToPutOutputFiles, f"bothCondsAnalysisSummary_{taskSelectorName}" + outputfileBaseName + ".json")
     write_json(file, toplevelBothCondsSummaries)
     
     return (outputfileBaseName, topLevelPreCondSummaries, topLevelPostCondSummaries, toplevelBothCondsSummaries)
