@@ -1,5 +1,6 @@
 import json
 import os.path
+import csv
 import statistics
 from func_timeout import func_timeout, FunctionTimedOut
 from typing import Dict
@@ -247,7 +248,10 @@ def analyzeTestResults_ofSelectedSuite(testResultsJsonFile:str,
         , all_verdicts
     )
 
-def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
+def analyzeTestResults(testResultsJsonFile:str, 
+                       dirToPutOutputFiles:str,
+                       savePerTaskSummaries:bool = True,
+                       saveWholeRawVerdictsData:bool = True):
     """
     Given a json-file containing tests-results as produce by the function exportLLMPTestResults(),
     this will calculate verdicts per candidate and produce per-task statistics and
@@ -325,29 +329,55 @@ def analyzeTestResults(testResultsJsonFile:str, dirToPutOutputFiles:str):
     # drop the "testResults_" prefix
     outputfileBaseName = testResultsJsonFile_BaseName[ len("testResults_") : ]
 
+    if savePerTaskSummaries:
+        def savePerTaskSummariesAsCSV(TS,csvfile):
+            taskIds = [ T["task_id"] for T in TS[0]["results"] ]
+            summaries2 = { tId:{ "task_id": tId } for tId in taskIds}
+            for suite in TS:
+               suiteName = suite["testsuite-name"]  
+               for taskSumry in suite["results"] :
+                   tId =  taskSumry["task_id"]  
+                   for property in taskSumry:
+                       if property in ["task_id", "cond-type", "testsuite-name"]:
+                           continue
+                       new_propertyName = f"{suiteName}_{property}"
+                       summaries2[tId][new_propertyName] = taskSumry[property]
+            
+            summaries2 = [ summaries2[tId] for tId in summaries2]
+            with open(csvfile, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(summaries2[0].keys())
+                for row in summaries2:
+                    writer.writerow(row.values())  
+                
+        file = os.path.join(dirToPutOutputFiles, "preCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".json")
+        csvfile = os.path.join(dirToPutOutputFiles, "preCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".csv")
+        perTaskSummaries1 = perTaskSummaries(results_preconds)
+        write_json(file, perTaskSummaries1)
+        savePerTaskSummariesAsCSV(perTaskSummaries1,csvfile)
+        file = os.path.join(dirToPutOutputFiles, "postCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".json")
+        csvfile = os.path.join(dirToPutOutputFiles, "postCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".csv")
+        perTaskSummaries2 = perTaskSummaries(results_postconds)
+        write_json(file, perTaskSummaries2)
+        savePerTaskSummariesAsCSV(perTaskSummaries2,csvfile)
+
+    if saveWholeRawVerdictsData:
+       file = os.path.join(dirToPutOutputFiles, "preCondAnalysisRawVerdicts_" + outputfileBaseName + ".json")
+       write_json(file, rawVerdicts(results_preconds))
+       file = os.path.join(dirToPutOutputFiles, "postCondAnalysisRawVerdicts_" + outputfileBaseName + ".json")
+       write_json(file, rawVerdicts(results_postconds))
+
+    topLevelPreCondSummaries   = topLevelSummries(results_preconds)
+    topLevelPostCondSummaries  = topLevelSummries(results_postconds)
+    toplevelBothCondsSummaries = topLevelSummriesOfCombinedPrePost(results_both_conditions)
     file = os.path.join(dirToPutOutputFiles, "preCondAnalysisSummary_" + outputfileBaseName + ".json")
-    write_json(file, topLevelSummries(results_preconds))
+    write_json(file,topLevelPreCondSummaries)
     file = os.path.join(dirToPutOutputFiles, "postCondAnalysisSummary_" + outputfileBaseName + ".json")
-    write_json(file, topLevelSummries(results_postconds))
+    write_json(file,topLevelPostCondSummaries)
     file = os.path.join(dirToPutOutputFiles, "bothCondsAnalysisSummary_" + outputfileBaseName + ".json")
-    write_json(file, topLevelSummriesOfCombinedPrePost(results_both_conditions))
-
-    file = os.path.join(dirToPutOutputFiles, "preCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".json")
-    write_json(file, perTaskSummaries(results_preconds))
-    file = os.path.join(dirToPutOutputFiles, "postCondAnalysisPerTaskSummaries_" + outputfileBaseName + ".json")
-    write_json(file, perTaskSummaries(results_postconds))
-
-    file = os.path.join(dirToPutOutputFiles, "preCondAnalysisRawVerdicts_" + outputfileBaseName + ".json")
-    write_json(file, rawVerdicts(results_preconds))
-    file = os.path.join(dirToPutOutputFiles, "postCondAnalysisRawVerdicts_" + outputfileBaseName + ".json")
-    write_json(file, rawVerdicts(results_postconds))
+    write_json(file, toplevelBothCondsSummaries)
     
-    #print (f"{topLevelSummries(results_postconds)}")
-    
-    return (outputfileBaseName, 
-              topLevelSummries(results_preconds), 
-              topLevelSummries(results_postconds),
-              topLevelSummriesOfCombinedPrePost(results_both_conditions))
+    return (outputfileBaseName, topLevelPreCondSummaries, topLevelPostCondSummaries, toplevelBothCondsSummaries)
 
        
 def executeSolutionPrePostCond(datasetFile:str, Tid:str, condTy:str, tc:list):
