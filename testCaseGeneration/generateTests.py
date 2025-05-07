@@ -221,13 +221,17 @@ def runPynguin(workingFolder: str, functionToTest: str, moduleName: str, searchT
            "--output-path", testFolder,
            "--report-dir", testOutputDir,
            "--maximum_search_time", searchTime,
-           "--original_type_weight", "100",
-           "--type4py_weight", "1",
-           "--type_tracing_weight", "1",
+           "--original_type_weight", "100.0",
+           "--type4py_weight", "0.01",
+           "--type_tracing_weight", "0.01",
+           "--any_weight", "0.01",
+           "--collection_size", "10",
+           "--none_weight", "0.01",
+           "--object_reuse_probability", "0.01",
            "--algorithm", algorithm,
            "--coverage-metrics", "BRANCH",
            "--assertion-generation", "NONE",
-           "--maximum-iterations", "1000",
+           "--maximum-iterations", "-1",
            "--create-coverage-report", "True",
            "--post_process", "True"
        ]
@@ -277,17 +281,24 @@ def parsePynguinTestCode(testsCode: str, task: str, tasks: dict) -> dict:
 
         for tc in testSuiteVector:
             # filter by precondition
-            checkPre = True
             if tasks[task]["pre_condition_solution"] != "":
                 # check precondition
                 checkPre = checkPreCondition(tc, tasks[task]["pre_condition_solution"])
                 # print(f"Pre check {checkPre}")
-            # if checkPre is None, something went wrong when running precondition. Ignore test case
-            if checkPre == None:
-                continue
-            elif not checkPre:
-                negativePreTests.append(removeDuplicatedTCs(tc))
-                continue
+                # if checkPre is None, something went wrong when running precondition. Ignore test case
+                if checkPre == None:
+                    continue
+
+                if checkPre:
+                    print(f"Add positive pre test {tc}")
+                    positivePreTests += [tc]
+                    # positivePreTests = []
+                elif not checkPre:
+                    negativePreTests += [tc]
+                    continue
+                else:
+                    # should not happen
+                    continue
 
             # tc passes pre condition
 
@@ -295,7 +306,11 @@ def parsePynguinTestCode(testsCode: str, task: str, tasks: dict) -> dict:
             tcWithOutput = computePrograOutput(tc, tasks[task]["program"])
             # if program return None, continue
             if tcWithOutput == None:
-                continue
+               continue
+            # check that tcWithOutput length is tc + 1
+            if (len(tcWithOutput) != len(tc) + 1):
+                print(f"TC {tc} extended with output is {tcWithOutput}")
+
             # tc has been extended with output successfully
             # check procondition
             postCheck = checkPostCondition(tcWithOutput, tasks[task]["post_condition_solution"])
@@ -304,17 +319,18 @@ def parsePynguinTestCode(testsCode: str, task: str, tasks: dict) -> dict:
             if postCheck == None:
                 continue
             elif postCheck:
-                positivePostTests.append(removeDuplicatedTCs(tcWithOutput))
+                print(f"Add positive post test {tcWithOutput} from pre test {tc}")
+                positivePostTests += [tcWithOutput]
             else:
                 print(f"Found negative post")
-                negativePostTests.append(removeDuplicatedTCs(tcWithOutput))
+                negativePostTests += [tcWithOutput]
                 #raise RuntimeError(f"Test case {tcWithOutput} fails post-condition check for task {task}")
 
 
-    outTests["positivePreTests"] = positivePreTests
-    outTests["negativePreTests"] = negativePreTests
-    outTests["positivePostTests"] = positivePostTests
-    outTests["negativePostTests"] = negativePostTests
+    outTests["positive_pre_tests"] = positivePreTests
+    outTests["negative_pre_tests"] = negativePreTests
+    outTests["positive_post_tests"] = positivePostTests
+    outTests["negative_post_tests"] = negativePostTests
     return  outTests
 
 def generateTestCases(parameters):
@@ -376,6 +392,7 @@ def generateTestCases(parameters):
             print("Processing task " + task)
 
             # generate the test suite for the current task
+            print("Run pynguin on " + task)
             pynguinTests = runPynguin(testFolder_, tasks[task]["program"], task, pynguinTimeBudget_, algorithm_)
             if pynguinTests == None:
                 print(f"Error in processing task {task}")
@@ -383,17 +400,17 @@ def generateTestCases(parameters):
 
             # extract the code of the test cases
             testsCode = extractTests(pynguinTests)
-            taskTests["tests_code"] = testsCode
+            #taskTests["tests_code"] = testsCode
 
             # get valid tests
-            print("Run pynguin on " + task)
             validPyTests = parsePynguinTestCode(testsCode, task, tasks)
 
-            posPreTestsTask.append(validPyTests['positivePreTests'])
-            negPreTestsTask.append(validPyTests['negativePreTests'])
-            posPostTestsTask.append(validPyTests['positivePostTests'])
+            posPreTestsTask += validPyTests['positive_pre_tests']
+            negPreTestsTask += validPyTests['negative_pre_tests']
+            posPostTestsTask += validPyTests['positive_post_tests']
+            negPostTestsTask += validPyTests['negative_post_tests']
 
-            if len(validPyTests['negativePostTests']) > 0:
+            if len(validPyTests['negative_post_tests']) > 0:
                 print(f"Error: pynguin generates negative post tests")
 
 
@@ -402,17 +419,25 @@ def generateTestCases(parameters):
             poodleTests = runPoodle(testFolder_, task,  tasks[task]["program"], pynguinTimeBudget_, algorithm_)
             print("Check poodle tests on " + task)
             for pt in poodleTests:
-                tc = extractTests(pt)
-                validPT = parsePynguinTestCode(tc, task, tasks)
-                posPreTestsTask.append(validPT['positivePreTests'])
-                negPreTestsTask.append(validPT['negativePreTests'])
-                posPostTestsTask.append(validPT['positivePostTests'])
-                negPostTestsTask.append(validPT['negativePostTests'])
+                 tc = extractTests(pt)
+                 # print(tc)
+                 validPT = parsePynguinTestCode(tc, task, tasks)
+                 print(validPT)
+                 posPreTestsTask += validPT['positive_pre_tests']
+                 negPreTestsTask  +=  validPT['negative_pre_tests']
+                 posPostTestsTask  +=  validPT['positive_post_tests']
+                 negPostTestsTask  +=  validPT['negative_post_tests']
 
-            taskTests['positivePreTests'] = str(removeDuplicatedTCs(posPreTestsTask))
-            taskTests['negativePreTests'] = str(removeDuplicatedTCs(negPreTestsTask))
-            taskTests['positivePostTests'] = str(removeDuplicatedTCs(posPostTestsTask))
-            taskTests['negativePostTests'] = str(removeDuplicatedTCs(negPostTestsTask))
+            taskTests['positive_pre_tests'] = str(removeDuplicatedTCs(posPreTestsTask))
+            taskTests['negative_pre_tests'] = str(removeDuplicatedTCs(negPreTestsTask))
+            taskTests['positive_post_tests'] = str(removeDuplicatedTCs(posPostTestsTask))
+            taskTests['negative_post_tests'] = str(removeDuplicatedTCs(negPostTestsTask))
+
+            # print(validPyTests)
+            # taskTests['positive_pre_tests'] = str(posPreTestsTask)
+            # taskTests['negative_pre_tests'] = str(negPreTestsTask)
+            # taskTests['positive_post_tests'] = str(posPostTestsTask)
+            # taskTests['negative_post_tests'] = str(negPostTestsTask)
 
             allTests.append(taskTests)
         # save in a json file all the generated tests
@@ -423,6 +448,7 @@ def generateTestCases(parameters):
     else:
         print(f"Cannot create test folder {testFolder_}. Quitting.")
         sys.exit(6)
+
 
 
 if __name__ == "__main__":

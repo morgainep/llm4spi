@@ -1,4 +1,5 @@
 import ast
+import copy
 import inspect
 import types
 import typing
@@ -230,8 +231,8 @@ def executeFunction(functionCode: str, actualParameters: []):
                 return functionOutput
             except Exception as e:
                 # print(e)
-                # raise RuntimeError(f"Error occurred during execution of the defined function '{functionCode_name}': {e}") from e
-                return None
+                raise RuntimeError(f"Error occurred during execution of the defined function '{functionCode_name}': {e}") from e
+                # return None
         else:
             return None
 
@@ -248,35 +249,52 @@ def executeFunction(functionCode: str, actualParameters: []):
 # apply pre-condition on generated test cases input and remove failing test cases
 def checkPreCondition(tc: [], preCondition: str) -> bool or None:
     # iterate over test suite
-    # print(f"Test case to filter: {tc}")
+    # print(f"Test case for filter: {tc}")
     # execute pre condition
-    out = executeFunction(preCondition, tc)
-    if isinstance(out, bool):
-            return(out)
-    return None
+    try:
+        out = executeFunction(preCondition, tc)
+        print(f"Test case pre filter {tc} says {out}")
+        if out == True or out == False:
+            return out
+        return None
+    except Exception as e:
+        print(f"Fail to run pre {preCondition} with input {tc}")
+        print(e)
+        return None
 
 # extend test case with sut output
-def computePrograOutput(tc: [], program: str) -> []:
+def computePrograOutput(tc: [], program: str) -> [] or None:
     # print(f"Test case to compute: {tc}")
-    out = executeFunction(program, tc)
-    tc.insert(0, out)
-    return  tc
+    try:
+        out = executeFunction(program, tc)
+        print(f"Test case {tc} returns {out}")
+        newTC = copy.copy(tc)
+        newTC.insert(0, out)
+        return  newTC
+    except Exception as e:
+        print(f"Fail to run prog {program} with input {tc}")
+        print(e)
+        return None
 
 # test posticondition
 def checkPostCondition(tc: [], postCondition: str) -> bool or None:
     # print(f"Test case to check post: {tc}")
-    out = executeFunction(postCondition, tc)
-    return out
-    # if isinstance(out, bool):
-    #   return out
-    # return None
+    try:
+        out = executeFunction(postCondition, tc)
+        print(f"Test case post filter {tc} says {out}")
+        # return out
+        if out == True or out == False:
+            return out
+        return None
+    except Exception as e:
+        print(f"Fail to run post {postCondition} with input {tc}")
+        print(e)
+        return None
 
-# remove duplicates from a TC
+# remove duplicated test cases
 def removeDuplicatedTCs(L1: typing.List[typing.Any]) -> typing.List[typing.Any]:
   L2 = []
   for item in L1:
-    # The 'in' operator on a list performs sequential comparison using '=='
-    # This works for nested lists and other unhashable types.
     if item not in L2:
       L2.append(item)
   return L2
