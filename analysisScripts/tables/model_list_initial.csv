@@ -1,0 +1,30 @@
+Model name,EvalPlus Leaderboard position,Link,Parameters (B),Size (GB),post (HE),pre (HE),Problem,Licence
+Artigenz-Coder-DS-6.7B,23,https://huggingface.co/Artigenz/Artigenz-Coder-DS-6.7B,6.74,26,,,Error load model,open
+athene-V2-Chat-72B,,https://huggingface.co/Nexusflow/Athene-V2-Chat,72.7,271,26,17,,open
+claude-3-7-sonnet,,,,,,,,proprietary
+claude3-haiku,37,,,,,,,proprietary
+CodeFuse-DeepSeek-33B,,https://huggingface.co/codefuse-ai/CodeFuse-DeepSeek-33B,33.3,125,7,0,,open
+codegemma-7b-it,62,https://huggingface.co/google/codegemma-7b-it,8.54,32,0,2,,open
+CodeQwen1.5-7B-Chat,15,https://huggingface.co/Qwen/CodeQwen1.5-7B-Chat,7.25,28,2,0,,open
+Codestral-22B-v0.1,20,https://huggingface.co/mistralai/Codestral-22B-v0.1,22.2,83,17,14,,open
+databricks/dbrx-instruct ,34,https://huggingface.co/databricks/dbrx-instruct,132,491,,,Too large,open
+DeepSeek-Coder-33B-instruct,19,https://huggingface.co/deepseek-ai/deepseek-coder-33b-instruct,33.3,125,4,3,,open
+gemini-1.5-flash,18,,,,,,,proprietary
+gemini-2.0-flash-exp,,,,,,,,proprietary
+gemma-3-27b-it,,https://huggingface.co/google/gemma-3-27b-it,27.4,,,,,open
+gemma-7b-it,99,https://huggingface.co/google/gemma-7b-it,8.54,32,0,1,,open
+gemma2-9b-it,,https://huggingface.co/google/gemma-2-9b-it,9.24,,,,,open
+gpt-3.5-turbo,32,,,,,,,proprietary
+gpt-4-turbo,11,,,,,,,proprietary
+gpt-4o,4,,,,,,,proprietary
+Hermes-2-Theta-Llama-3-70B,,https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-70B,70.6,,,,,open
+Magicoder-S-DS-6.7B,30,https://huggingface.co/ise-uiuc/Magicoder-S-DS-6.7B,6.74,26,,,Error load model,open
+Meta-Llama-3-70B-Instruct,24,https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct,70.6,263,22,15,,open
+Mixtral-8x22B-Instruct-v0.1,25,https://huggingface.co/mistralai/Mixtral-8x22B-Instruct-v0.1,141,524,,,Too large,open
+Nxcode-CQ-7B-orpo,,https://huggingface.co/NTQAI/Nxcode-CQ-7B-orpo,7.25,28,2,1,,open
+OpenCodeInterpreter-DS-6.7B,26,https://huggingface.co/m-a-p/OpenCodeInterpreter-DS-6.7B,6.74,26,6,8,,open
+OpenCoder-8B-Instruct,16,https://huggingface.co/infly/OpenCoder-8B-Instruct,7.77,29,9,3,,open
+Qwen2.5-Coder-32B-Instruct,3,https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct,32.8,123,29,11,,open
+speechless-codellama-34b-v2.0,27,https://huggingface.co/uukuguy/speechless-codellama-34b-v2.0,34,126,9,14,,open
+starchat2-15b-v0.1,31,https://huggingface.co/HuggingFaceH4/starchat2-15b-v0.1,16,60,1,5,,open
+WizardCoder-33B-V1.1,22,https://huggingface.co/WizardLM/WizardCoder-33B-V1.1,33.3,125,17,8,,open
