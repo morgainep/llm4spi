@@ -267,7 +267,7 @@ if __name__ == '__main__':
 
     generate_results(myAIclient,
                      dataset, 
-                     specificProblem = "HE20" ,
+                     specificProblem = "HE21" ,
                      experimentName = "bla",     
                      enableEvaluation = True, 
                      allowMultipleAnswers = 3,
