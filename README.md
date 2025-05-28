@@ -3,6 +3,7 @@
 Since LLMs are so smart, we wonder how good they are for generating 'formal' specifications. Or at least, specifications that can be executed so we can actually use them for checking the inputs and outputs of programs under test.
 
 The project provides a framework for assessing LLMs ability to extract formal pre- and post-conditions from a program's description. We can consider both commercial LLMs like OpenAI GPTs as well open source LLMs.
+Note that the project only provides the assessment framework. To actually do the assessment you also need a dataset containing problems/challenges. Such datasets are not provided here; they are provided separately.
 
 Example prompt-1: _Give a Python program `Postcondition(x,y,z)` that checks whether the sum of x and y is zero or equal to z_
 
@@ -58,15 +59,47 @@ print(Postcondition(joke))  # Output: True
 
 
 
-## Required Python packages
+## Required Python and Python packages
 
-* To use OpenAI models: `pip install openai`
-* If you want to use Gpt4All: `pip install gpt4all`
-* To use Hugging Face models: `pip install huggingface-hub`
+* Require Python 3.12
+* pip install the following packages:
+  * To use OpenAI models: `openai`
+  * To use Gpt4All: `gpt4all`
+  * To use Hugging Face models: `huggingface-hub`
+  * To use Google models: `google-genai`
+  * To use open models compatible with llama-cpp: `llama-cpp-python`
 
 ## Datasets
 
-Need to be in a json-format with a structure compatible for llm4spi. TODO: describe the structure. Example: see `mini.json`.
+This project does not come with a dataset. They are to be provided separately. A dataset is essentially a set of programming problems. Each problem is a tuple (D,F,pre,post,T) where D is a natural language description of some program (describing what functionality the program is supposed to provide), F is a Python implementation of D, pre is a solution pre-condition of F, post is a solution post-condition of F, and T is a set of tests. The task of an LLM is to propose a pre' and post', given the description D. The proposals are correct if they are equivalent to the solutions pre/post, validated by testing using T.
+
+A dataset is expected to be provided as a json-file of a specific structure. As an xample: see the file `mini.json`.
+
+
+## Usage
+
+Go to the directory `llm4spi`, you can run the analysis tool from the command line by running the script `clispi.py`:
+
+   `> python clispi.py -h` will show available options.
+
+Example:
+
+   `> python clispi.py --provider=openAI --model=gpt3.5 --benchmarkDir=../ --benchmark=mini`
+
+This will run the evaluation of openAI GPT3.5 LLM against the benchmark called _mini_. This assumes a dataset named `mini.json` exists in the directory specified by the option `--benchmarkDir`. For every problem in this _mini_ dataset, the evaluation script will send a prompt to the API of OpenAI, asking for proposal pre- and post-conditions. Use the option `--allowMultipleAnswers` if you want to obtain multiple proposals per problem.
+
+After the evaluation, a summary will be printed to the console, and several files will be generated in the directory `./results`. There will be a csv file containing a summary of the evaluation, and also a json file containing raw responses from the LLM as well as distilled responses.
+
+To access OpenAI models you will need an API-key. Set the key in the env-variable `OPENAI_API_KEY`. Similarly, to use Anthropic's models you need an API-key as well; set it in the env-var `ANTHROPIC_API_KEY`.
+
+Implemented providers: `openAI`, `gpt4all`, `groq`, `anthropic`, `gemini`, and  `llamacpp`.
+
+
+
+
+
+
+## Other notes
 
 #### Some notes on using GPT4All
 
