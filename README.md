@@ -139,7 +139,7 @@ The produced file: `extendedResults_xxx_all_yyy.json`.
 
 #### Some notes on using GPT4All
 
-You can use a [Docker-image with GPT4All installed](https://hub.docker.com/r/morgaine/llm4spi). The image has:
+If you want to use GPT4All-compatible models and run them on a GPU, getting GPT4All working can be a bit painful. You can use also use a [Docker-image with GPT4All installed](https://hub.docker.com/r/morgaine/llm4spi); the image has:
 
 * Ubuntu 22-04
 * Python 3.12 installed
