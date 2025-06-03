@@ -22,8 +22,8 @@ theme_se <- function(){
       panel.grid.major = element_line(linewidth=0.5, colour = "gray90"),
       panel.grid.minor = element_blank(),
       axis.ticks = element_blank()
-    )}
-
+    )
+}
 # Fast list to dataframe transformation
 fromListToDF <- function(inputList){
   if (is.null(inputList)){return(NULL)}

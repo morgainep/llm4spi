@@ -191,6 +191,7 @@ analyze_task <- function(taskId, tb){
   this_out$avg_p_Error <- mean(this_tb$p_Error)
   this_out$sd_p_Error <- sd(this_tb$p_Error)
   
+  this_out$median_p_Pass <- median(this_tb$p_Pass)
   this_out$avg_p_Pass <- mean(this_tb$p_Pass)
   this_out$sd_p_Pass <- sd(this_tb$p_Pass)
   
@@ -226,6 +227,7 @@ analyze_model <- function(modelId, tb){
   
   this_out$avg_evalAt1 <- mean(this_tb$evalAt1)
   this_out$sd_evalAt1 <- sd(this_tb$evalAt1)
+  this_out$median_Pass <- median(this_tb$avg_p_Pass)
   this_out$avg_Pass <- mean(this_tb$avg_p_Pass)
   this_out$sd_Pass <- sd(this_tb$avg_p_Pass)
   this_out$min_Pass <- min(this_tb$avg_p_Pass)
@@ -283,6 +285,8 @@ for (rs in res_files) {
 
 ######################
 # add information about models
+#models_description[which(!models_description$`Full name` %in% summary_table$model),]
+#summary_table[which(!summary_table$model %in% models_description$`Full name`),]
 before_merge <- nrow(summary_table)
 summary_table <- merge(summary_table, models_description, by.x = 'model', by.y = 'Full name')
 if (nrow(summary_table) != before_merge){
