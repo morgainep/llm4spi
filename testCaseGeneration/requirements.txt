@@ -1,0 +1,2 @@
+pynguin==0.40.0
+poodle==1.3.3

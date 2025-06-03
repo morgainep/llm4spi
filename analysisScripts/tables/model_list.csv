@@ -1,0 +1,25 @@
+Full name,Short name,EvalPlus Leaderboard position,Link,Parameters (B),Size (GB),post (HE),pre (HE),Licence
+athene-v2-chat,Athene,,https://huggingface.co/Nexusflow/Athene-V2-Chat,72.7,271,26,17,open
+claude-3-7-sonnet,Claude3.7,,,,,,,proprietary
+claude-3,Claude3,37,,,,,,proprietary
+CodeFuse-DeepSeek-33B,CodeFuse,,https://huggingface.co/codefuse-ai/CodeFuse-DeepSeek-33B,33.3,125,7,0,open
+codegemma-7b-it,CodeGemma,62,https://huggingface.co/google/codegemma-7b-it,8.54,32,0,2,open
+CodeQwen1.5-7B-Chat,CodeQwen1.5,15,https://huggingface.co/Qwen/CodeQwen1.5-7B-Chat,7.25,28,2,0,open
+Codestral-22B-v0.1,Codestral,20,https://huggingface.co/mistralai/Codestral-22B-v0.1,22.2,83,17,14,open
+deepseek-coder-33b-instruct,DeepSeekCoder,19,https://huggingface.co/deepseek-ai/deepseek-coder-33b-instruct,33.3,125,4,3,open
+gemini-1.5-flash,Gemini1.5,18,,,,,,proprietary
+gemini-2.0-flash-exp,Gemini2.0,,,,,,,proprietary
+gemma-3-27b,Gemma3,,https://huggingface.co/google/gemma-3-27b-it,27.4,,,,open
+gpt-3.5-turbo,GTP3.5,32,,,,,,proprietary
+gpt-4-turbo,GPT4,11,,,,,,proprietary
+gpt-4o,GPT4o,4,,,,,,proprietary
+Hermes-2-Theta-Llama-3-70B,Hermes2,,https://huggingface.co/NousResearch/Hermes-2-Theta-Llama-3-70B,70.6,,,,open
+Meta-Llama-3-70B-Instruct,Llama3,24,https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct,70.6,263,22,15,open
+Nxcode-CQ-7B-orpo,Nxcode,,https://huggingface.co/NTQAI/Nxcode-CQ-7B-orpo,7.25,28,2,1,open
+OpenCodeInterpreter-DS-6.7B,OpenCodeInt,26,https://huggingface.co/m-a-p/OpenCodeInterpreter-DS-6.7B,6.74,26,6,8,open
+OpenCoder-8B-Instruct,OpenCoder,16,https://huggingface.co/infly/OpenCoder-8B-Instruct,7.77,29,9,3,open
+Qwen2.5-Coder-32B-Instruct,Qwen2.5,3,https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct,32.8,123,29,11,open
+speechless-codellama-34b-v2.0,Codellama,27,https://huggingface.co/uukuguy/speechless-codellama-34b-v2.0,34,126,9,14,open
+starchat2-15b-v0.1,Starchat2,31,https://huggingface.co/HuggingFaceH4/starchat2-15b-v0.1,16,60,1,5,open
+WizardCoder-33B-V1.1,WizardCoder,22,https://huggingface.co/WizardLM/WizardCoder-33B-V1.1,33.3,125,17,8,open
+Qwen3-32B ,Qwen3,,https://huggingface.co/Qwen/Qwen3-32B,32.8,123,,,open
